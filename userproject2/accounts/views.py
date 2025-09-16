@@ -2,7 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken  # JWT import
 from .models import CustomUser
 from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
 
@@ -19,8 +19,15 @@ class LoginView(APIView):
         if serializer.is_valid():
             user = serializer.validated_data['user']
             login(request, user)
-            token, _ = Token.objects.get_or_create(user=user)
-            return Response({'token': token.key, 'user': UserSerializer(user).data})
+            
+            # JWT tokens generate karein (regular token removed)
+            refresh = RefreshToken.for_user(user)
+            
+            return Response({
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user': UserSerializer(user).data
+            })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UserListView(generics.ListAPIView):
@@ -39,7 +46,8 @@ class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        request.user.auth_token.delete()
+        # JWT doesn't need token deletion from database
+        # Simple logout and blacklist handling can be done if needed
         logout(request)
         return Response({'message': 'Successfully logged out'})
 
@@ -52,8 +60,11 @@ def home(request):
         "endpoints": {
             "register": "/api/auth/register/",
             "login": "/api/auth/login/",
+            "users": "/api/auth/users/",
             "profile": "/api/auth/profile/",
             "logout": "/api/auth/logout/",
+            "jwt_token": "/api/token/",
+            "jwt_refresh": "/api/token/refresh/",
             "admin": "/admin/"
         }
     })
