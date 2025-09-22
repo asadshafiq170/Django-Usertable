@@ -1,15 +1,29 @@
+# accounts/views.py
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout
-from rest_framework_simplejwt.tokens import RefreshToken  # JWT import
+from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser
 from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
+from django.shortcuts import render, redirect
+from django.contrib.auth import login as auth_login, authenticate
+from django.contrib.auth.forms import UserCreationForm
+from .signals import user_registered
 
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+
+    def perform_create(self, serializer):
+        user = serializer.save()
+        # Custom signal trigger karein
+        user_registered.send(
+            sender=user.__class__, 
+            user=user, 
+            request=self.request
+        )
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -18,9 +32,9 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data['user']
-            login(request, user)
+            auth_login(request, user)
             
-            # JWT tokens generate karein (regular token removed)
+            # JWT tokens generate karein
             refresh = RefreshToken.for_user(user)
             
             return Response({
@@ -46,8 +60,6 @@ class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        # JWT doesn't need token deletion from database
-        # Simple logout and blacklist handling can be done if needed
         logout(request)
         return Response({'message': 'Successfully logged out'})
 
@@ -68,3 +80,23 @@ def home(request):
             "admin": "/admin/"
         }
     })
+
+def register(request):
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            
+            # Custom signal trigger karein
+            user_registered.send(
+                sender=user.__class__, 
+                user=user, 
+                request=request
+            )
+            
+            auth_login(request, user)
+            return redirect('home')
+    else:
+        form = UserCreationForm()
+    
+    return render(request, 'registration/register.html', {'form': form})
