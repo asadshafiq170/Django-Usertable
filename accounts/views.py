@@ -1,13 +1,14 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.contrib.auth import login
-from rest_framework.authtoken.models import Token
 from django.http import JsonResponse
 from .models import CustomUser
 from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
+
 
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
@@ -22,22 +23,15 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data['user']
-            login(request, user)
-            token, _ = Token.objects.get_or_create(user=user)
+
+            refresh = RefreshToken.for_user(user)
+
             return Response({
-                'token': token.key,
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
                 'user': UserSerializer(user).data
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class LogoutView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        request.user.auth_token.delete()
-        return Response({'message': 'Successfully logged out'})
-
 
 class UserListView(generics.ListAPIView):
     queryset = CustomUser.objects.all()
@@ -69,6 +63,6 @@ def home(request):
 @permission_classes([IsAuthenticated])
 def protected_view(request):
     return Response({
-        "message": "JWT working fine ✅",
+        "message": "JWT working fine",
         "user": request.user.username
     })

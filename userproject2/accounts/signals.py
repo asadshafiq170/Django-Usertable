@@ -3,9 +3,9 @@ from django.dispatch import Signal, receiver
 from django.db.models.signals import post_save, pre_save
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import CustomUser  # CustomUser import karein
+from .models import CustomUser  # CustomUser import
 
-# Naye syntax se custom signals define karein
+# Naye syntax se custom signals define
 user_registered = Signal()
 profile_updated = Signal()
 
