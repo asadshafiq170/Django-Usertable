@@ -1,4 +1,4 @@
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, viewsets, mixins
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout
@@ -8,6 +8,10 @@ from .models import CustomUser
 from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
 from .signals import user_registered
 
+
+# -------------------
+# API VIEWS
+# -------------------
 
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
@@ -77,4 +81,37 @@ class HomeView(APIView):
                 "admin": "/admin/"
             }
         }, status=status.HTTP_200_OK)
-    
+
+
+# -------------------
+#  ViewSets
+# -------------------
+
+# 1. Simple ViewSet (sab manually likhna parta hai)
+class UserViewSet(viewsets.ViewSet):
+    def list(self, request):
+        users = CustomUser.objects.all()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
+
+    def retrieve(self, request, pk=None):
+        try:
+            user = CustomUser.objects.get(pk=pk)
+            serializer = UserSerializer(user)
+            return Response(serializer.data)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+# 2. GenericViewSet (mixins ke sath)
+class UserGenericViewSet(mixins.ListModelMixin,
+                         mixins.RetrieveModelMixin,
+                         viewsets.GenericViewSet):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+
+
+# 3. ModelViewSet (full CRUD ready-made)
+class UserModelViewSet(viewsets.ModelViewSet):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
