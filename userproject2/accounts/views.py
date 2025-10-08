@@ -7,13 +7,14 @@ from django.http import JsonResponse
 from .models import CustomUser
 from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
 from .signals import user_registered
+from .permissions import IsAdultUser
 
 
 # -------------------
 # API VIEWS
 # -------------------
 
-class RegisterView(generics.CreateAPIView):
+class RegisterView(generics.CreateAPIView):  ### sirf create krta hai
     queryset = CustomUser.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
@@ -23,7 +24,7 @@ class RegisterView(generics.CreateAPIView):
         user_registered.send(sender=user.__class__, user=user, request=self.request)
 
 
-class LoginView(APIView):
+class LoginView(APIView):  ### login krta hai
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -41,13 +42,13 @@ class LoginView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserListView(generics.ListAPIView):
+class UserListView(generics.ListAPIView):  ### only list krta hai
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
 
-class UserDetailView(generics.RetrieveUpdateAPIView):
+class UserDetailView(generics.RetrieveUpdateAPIView): ### get krta hai aur update krta hai
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -55,7 +56,7 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
-class LogoutView(APIView):
+class LogoutView(APIView):  ### logout krta hai
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -63,7 +64,7 @@ class LogoutView(APIView):
         return Response({"message": "Successfully logged out"})
 
 
-class HomeView(APIView):
+class HomeView(APIView):  ### simple welcome message
     permission_classes = [permissions.AllowAny]  # Public endpoint
 
     def get(self, request):
@@ -88,7 +89,7 @@ class HomeView(APIView):
 # -------------------
 
 # 1. Simple ViewSet (sab manually likhna parta hai)
-class UserViewSet(viewsets.ViewSet):
+class UserViewSet(viewsets.ViewSet):   #### manually sab kuch likhna parta hai
     def list(self, request):
         users = CustomUser.objects.all()
         serializer = UserSerializer(users, many=True)
@@ -103,8 +104,9 @@ class UserViewSet(viewsets.ViewSet):
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
-# 2. GenericViewSet (mixins ke sath)
-class UserGenericViewSet(mixins.ListModelMixin,
+# 2. GenericViewSet (mixins ke sath) ### ak time pay hum 3 cruds use kr sakty hain ###
+
+class UserGenericViewSet(mixins.ListModelMixin,   ## sirf list aur retrieve krta hai
                          mixins.RetrieveModelMixin,
                          viewsets.GenericViewSet):
     queryset = CustomUser.objects.all()
@@ -112,6 +114,22 @@ class UserGenericViewSet(mixins.ListModelMixin,
 
 
 # 3. ModelViewSet (full CRUD ready-made)
-class UserModelViewSet(viewsets.ModelViewSet):
+class UserModelViewSet(viewsets.ModelViewSet):  ### full CRUD ready-made
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
+
+
+## Permission Implementation ###
+
+# class UserDetailView(generics.RetrieveUpdateAPIView):
+#     serializer_class = UserSerializer
+#     permission_classes = [permissions.IsAuthenticated, IsOwnerOnly]
+
+#     def get_object(self):
+#         return self.request.user
+
+
+class UserListView(generics.ListAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdultUser]

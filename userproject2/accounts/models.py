@@ -3,9 +3,9 @@ from django.contrib.auth.models import AbstractUser
 from datetime import date
 
 
-class CustomUser(AbstractUser):
-    phone = models.CharField(max_length=11, blank=True, null=True)
-    date_of_birth = models.DateField(blank=True, null=True)
+class CustomUser(AbstractUser):  ## extending default user model
+    phone = models.CharField(max_length=15, blank=True, null=True)
+    date_of_birth = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return self.username
@@ -21,7 +21,7 @@ class CustomUser(AbstractUser):
         return False
 
 
-class UserProfile(models.Model):
+class UserProfile(models.Model):  ## additional profile info
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     bio = models.TextField(blank=True)
     phone = models.CharField(max_length=15, blank=True)
