@@ -1,135 +1,110 @@
-from rest_framework import generics, permissions, status, viewsets, mixins
+from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from django.contrib.auth import login, logout
+from rest_framework.decorators import action
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.http import JsonResponse
 from .models import CustomUser
-from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
+from .serializers import (
+    UserSerializer,
+    RegisterSerializer,
+    LoginSerializer,
+    UpdateUserSerializer,
+    PartialUpdateUserSerializer,
+    DeleteUserSerializer
+)
 from .signals import user_registered
 from .permissions import IsAdultUser
 
 
-# -------------------
-# API VIEWS
-# -------------------
-
-class RegisterView(generics.CreateAPIView):  ### sirf create krta hai
+class UserModelViewSet(viewsets.ModelViewSet):
+    """
+    🔹 Unified ViewSet for all User operations
+    """
     queryset = CustomUser.objects.all()
-    serializer_class = RegisterSerializer
-    permission_classes = [permissions.AllowAny]
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-    def perform_create(self, serializer):
-        user = serializer.save()
-        user_registered.send(sender=user.__class__, user=user, request=self.request)
+    # -------------------------
+    # REGISTER
+    # -------------------------
+    @action(detail=False, methods=["post"], permission_classes=[permissions.AllowAny])
+    def register(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            user_registered.send(sender=user.__class__, user=user, request=request)
+            return Response(
+                {"message": "User registered successfully!", "user": UserSerializer(user).data},
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-class LoginView(APIView):  ### login krta hai
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
+    # -------------------------
+    # LOGIN
+    # -------------------------
+    @action(detail=False, methods=["post"], permission_classes=[permissions.AllowAny])
+    def login(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.validated_data['user']
+            user = serializer.validated_data["user"]
             login(request, user)
-
             refresh = RefreshToken.for_user(user)
             return Response({
                 "refresh": str(refresh),
                 "access": str(refresh.access_token),
                 "user": UserSerializer(user).data
-            })
+            }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-class UserListView(generics.ListAPIView):  ### only list krta hai
-    queryset = CustomUser.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-
-class UserDetailView(generics.RetrieveUpdateAPIView): ### get krta hai aur update krta hai
-    serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_object(self):
-        return self.request.user
-
-
-class LogoutView(APIView):  ### logout krta hai
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
+    # -------------------------
+    # LOGOUT
+    # -------------------------
+    @action(detail=False, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def logout(self, request):
         logout(request)
-        return Response({"message": "Successfully logged out"})
+        return Response({"message": "Successfully logged out!"}, status=status.HTTP_200_OK)
 
-
-class HomeView(APIView):  ### simple welcome message
-    permission_classes = [permissions.AllowAny]  # Public endpoint
-
-    def get(self, request):
-        return Response({
-            "message": " Welcome Asad! Good to see you here ",
-            "developer": "Asad Hussain",
-            "endpoints": {
-                "register": "/api/auth/register/",
-                "login": "/api/auth/login/",
-                "users": "/api/auth/users/",
-                "profile": "/api/auth/profile/",
-                "logout": "/api/auth/logout/",
-                "jwt_token": "/api/token/",
-                "jwt_refresh": "/api/token/refresh/",
-                "admin": "/admin/"
-            }
-        }, status=status.HTTP_200_OK)
-
-
-# -------------------
-#  ViewSets
-# -------------------
-
-# 1. Simple ViewSet (sab manually likhna parta hai)
-class UserViewSet(viewsets.ViewSet):   #### manually sab kuch likhna parta hai
-    def list(self, request):
+    # -------------------------
+    # USERS LIST (ADULTS ONLY)
+    # -------------------------
+    @action(detail=False, methods=["get"], permission_classes=[permissions.IsAuthenticated, IsAdultUser])
+    def users(self, request):
         users = CustomUser.objects.all()
         serializer = UserSerializer(users, many=True)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def retrieve(self, request, pk=None):
-        try:
-            user = CustomUser.objects.get(pk=pk)
+    # -------------------------
+    # PROFILE VIEW / UPDATE / PATCH
+    # -------------------------
+    @action(detail=False, methods=["get", "put", "patch"], permission_classes=[permissions.IsAuthenticated])
+    def profile(self, request):
+        user = request.user
+
+        if request.method == "GET":
             serializer = UserSerializer(user)
-            return Response(serializer.data)
-        except CustomUser.DoesNotExist:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
+        elif request.method == "PUT":
+            serializer = UpdateUserSerializer(user, data=request.data)
+        else:
+            serializer = PartialUpdateUserSerializer(user, data=request.data, partial=True)
 
-# 2. GenericViewSet (mixins ke sath) ### ak time pay hum 3 cruds use kr sakty hain ###
+        if serializer.is_valid():
+            serializer.save()
+            msg = "Profile fully updated" if request.method == "PUT" else "Profile partially updated"
+            return Response({"message": msg, "user": serializer.data}, status=status.HTTP_200_OK)
 
-class UserGenericViewSet(mixins.ListModelMixin,   ## sirf list aur retrieve krta hai
-                         mixins.RetrieveModelMixin,
-                         viewsets.GenericViewSet):
-    queryset = CustomUser.objects.all()
-    serializer_class = UserSerializer
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-# 3. ModelViewSet (full CRUD ready-made)
-class UserModelViewSet(viewsets.ModelViewSet):  ### full CRUD ready-made
-    queryset = CustomUser.objects.all()
-    serializer_class = UserSerializer
-
-
-## Permission Implementation ###
-
-# class UserDetailView(generics.RetrieveUpdateAPIView):
-#     serializer_class = UserSerializer
-#     permission_classes = [permissions.IsAuthenticated, IsOwnerOnly]
-
-#     def get_object(self):
-#         return self.request.user
-
-
-class UserListView(generics.ListAPIView):
-    queryset = CustomUser.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdultUser]
+    # -------------------------
+    # DELETE ACCOUNT
+    # -------------------------
+    @action(detail=False, methods=["delete"], permission_classes=[permissions.IsAuthenticated])
+    def delete_account(self, request):
+        user = request.user
+        username = user.username
+        user.delete()
+        return Response(
+            {"message": f"User '{username}' deleted successfully."},
+            status=status.HTTP_200_OK
+        )
