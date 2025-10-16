@@ -3,14 +3,16 @@ from django.contrib.auth.models import AbstractUser
 from datetime import date
 
 
-class CustomUser(AbstractUser):  ## extending default user model
+# -------------------------------
+# Custom User Model
+# -------------------------------
+class CustomUser(AbstractUser):
     phone = models.CharField(max_length=15, blank=True, null=True)
     date_of_birth = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return self.username
 
-    # Model Methods
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
 
@@ -21,7 +23,10 @@ class CustomUser(AbstractUser):  ## extending default user model
         return False
 
 
-class UserProfile(models.Model):  ## additional profile info
+# -------------------------------
+# User Profile Model
+# -------------------------------
+class UserProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     bio = models.TextField(blank=True)
     phone = models.CharField(max_length=15, blank=True)
@@ -32,3 +37,18 @@ class UserProfile(models.Model):  ## additional profile info
 
     def short_bio(self):
         return self.bio[:50] + "..." if len(self.bio) > 50 else self.bio
+
+
+# -------------------------------
+# Proxy Model (AdultUser)
+# -------------------------------
+class AdultUser(CustomUser):
+    class Meta:
+        proxy = True
+        ordering = ['username']
+        verbose_name = "Adult User"
+        verbose_name_plural = "Adult Users"
+
+    def is_adult_user(self):
+        """Custom logic for adults"""
+        return self.date_of_birth and (date.today().year - self.date_of_birth.year) >= 18
