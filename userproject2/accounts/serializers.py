@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from .models import CustomUser
 
-# ✅ User Serializer
+#  User Serializer
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     is_adult = serializers.SerializerMethodField()
@@ -21,7 +21,7 @@ class UserSerializer(serializers.ModelSerializer):
         return obj.is_adult()
 
 
-# ✅ Register Serializer
+#  Register Serializer
 class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
@@ -32,7 +32,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         return CustomUser.objects.create_user(**validated_data)
 
 
-# ✅ Login Serializer
+#  Login Serializer
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)

@@ -14,7 +14,7 @@ from .serializers import (
 from .signals import user_registered
 from .permissions import IsAdultUser
 
-# ✅ Custom decorator
+#  Custom decorator
 def log_api_call(func):
     @wraps(func)
     def wrapper(self, request, *args, **kwargs):
@@ -24,7 +24,7 @@ def log_api_call(func):
     return wrapper
 
 
-# ✅ Unified ViewSet
+#  Unified ViewSet
 class UserModelViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
@@ -92,3 +92,5 @@ class UserModelViewSet(viewsets.ModelViewSet):
         username = request.user.username
         request.user.delete()
         return Response({"message": f"User '{username}' deleted successfully."})
+    
+
